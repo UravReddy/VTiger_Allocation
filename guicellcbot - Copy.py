@@ -3,7 +3,6 @@ import tkinter
 import os
 from tkinter import messagebox
 from tkinter import filedialog
-import csv
 import mysql.connector
 from mysql.connector import Error
 from tkinter import scrolledtext
@@ -84,8 +83,9 @@ def btnClick():
         mycursor3 = mydb.cursor()
         agentml = ''
         saleid = 0
+        #ccnum is the contactid 
         ccnum=''
-
+        #checking for unallocated sales
         unallocated_stmt = """SELECT vtiger_contactscf.contactid AS saleid,vtiger_contactscf.cf_797 as idnum,vtiger_contactdetails.contact_no FROM vtiger_contactscf INNER JOIN vtiger_crmentity ON vtiger_crmentity.crmid=vtiger_contactscf.contactid INNER JOIN vtiger_users ON vtiger_users.id=vtiger_crmentity.smcreatorid INNER JOIN vtiger_contactdetails ON vtiger_contactdetails.contactid=vtiger_crmentity.crmid WHERE vtiger_users.user_name NOT IN('') AND vtiger_crmentity.createdtime LIKE '%s' AND setype='Contacts' AND vtiger_contactscf.cf_847='' LIMIT 1""" % (
                     today + '%')
         mycursor2.execute(unallocated_stmt)
@@ -95,19 +95,22 @@ def btnClick():
             idnum = row[1]
             ccnum= row[2]
         if saleid > 1:
+            #if unallocated sale found, check if this customer has another record that been audited then allocate this sale to that specific user
             findmultiliner_stmt = """SELECT vtiger_contactscf.contactid,cf_847 FROM vtiger_contactscf INNER JOIN vtiger_crmentity ON vtiger_crmentity.crmid=vtiger_contactscf.contactid INNER JOIN vtiger_users ON vtiger_users.id=vtiger_crmentity.smcreatorid WHERE vtiger_users.user_name NOT IN('') AND cf_797='%s' AND cf_847<>'' AND vtiger_crmentity.createdtime LIKE '%s'""" % (
             idnum, today + '%')
             mycursor.execute(findmultiliner_stmt)
             myresult = mycursor.fetchall()
             for row in myresult:
                 agentml = row[1]
-            if agentml == '' and saleid > 1:
+            #If this is a fresh sale allocate it to the next user in the list
+            if agentml == '' and saleid > 1:     
                 assignsale_stmt = """UPDATE vtiger_contactscf SET cf_847='%s' WHERE contactid='%s'""" % (
                 agent[counter2], saleid)
                 mycursor.execute(assignsale_stmt)
                 mydb.commit()
                 texta.insert(INSERT,"Sale Assigned To:" + agent[counter2]+" at "+str(datetime.now().strftime("%H:%M:%S"))+"\n")
                 counter2 = counter2 + 1                
+            #else allocate to the original auditer    
             else:
                 assignmultiliner_stmt = """UPDATE vtiger_contactscf SET cf_847='%s' WHERE contactid='%s'""" % (
                 agentml, saleid)
